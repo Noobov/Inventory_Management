@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Object Detection App</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 20px;
+        }
+
+        h2 {
+            color: #333;
+            text-align: center;
+        }
+
+        .container {
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .video-feed {
+            flex: 1;
+            margin-right: 20px;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .inventory {
+            flex: 1;
+            background-color: #fff;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+
+        th {
+            background-color: #007bff;
+            color: white;
+        }
+
+        tr:hover {
+            background-color: #f1f1f1;
+        }
+
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+
+        button:hover {
+            background-color: #0056b3; /* Darker blue on hover */
+        }
+
+        input[type="text"], input[type="number"] {
+            width: calc(100% - 22px);
+            padding: 10px;
+            margin-top: 10px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+        }
+
+        input[type="text"]:focus, input[type="number"]:focus {
+            border-color: #007bff; /* Blue border on focus */
+            outline: none; /* Remove default outline */
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="video-feed">
+        <h2>Video Feed</h2>
+        <button onclick="startVideo()">Start Video Capture</button>
+        <button onclick="stopVideo()">Stop Video Capture</button>
+        <div>
+            <img id="video" width="100%">
+        </div>
+    </div>
+
+    <div class="inventory">
+        <h2>Inventory</h2>
+        <table id="inventory-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Object Name</th>
+                    <th>Count</th>
+                    <th>Date Added</th>
+                    <th>Time Added</th>
+                    <th>Accuracy</th>
+                    <th>Bounding Box Area</th> <!-- Updated column name -->
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="inventory-body">
+                <!-- Inventory rows will be dynamically added here -->
+            </tbody>
+        </table>
+
+        <!-- Input fields for updating -->
+        <input type="text" id="update-object-name" placeholder="New Object Name">
+        <input type="number" id="update-count" placeholder="New Count">
+        <input type="number" id="update-accuracy" placeholder="New Accuracy">
+
+        <!-- Update Button -->
+        <button onclick="updateObject()">Update</button>
+
+        <!-- Export Buttons -->
+        <button onclick="exportToCSV()">Export to CSV</button>
+        <button onclick="exportToXLSX()">Export to XLSX</button>
+
+    </div>
+</div>
+
+<script>
+// Function to start video capture and display it on the webpage
+function startVideo() {
+   fetch('/start_video')
+       .then(response => response.json())
+       .then(data => {
+           if (data.success) {
+               const videoElement = document.getElementById('video');
+               videoElement.src = "/video_feed"; // Set the source of the image to the video feed URL
+           }
+       });
+}
+
+// Function to stop video capture
+function stopVideo() {
+   fetch('/stop_video')
+       .then(response => response.json())
+       .then(data => {
+           if (data.success) {
+               console.log("Video capture stopped.");
+               const videoElement = document.getElementById('video');
+               videoElement.src = ""; // Clear the source of the image to stop displaying the stream
+           }
+       });
+}
+
+// Function to periodically fetch and update inventory
+function fetchInventory() {
+   fetch('/get_inventory')
+       .then(response => response.json())
+       .then(objects => {
+           const tbody = document.getElementById('inventory-body');
+           tbody.innerHTML = ""; // Clear previous entries
+
+           objects.forEach(item => {
+               const row = tbody.insertRow();
+               row.insertCell(0).innerHTML = item.id;
+               row.insertCell(1).innerHTML = item.object_name;
+               row.insertCell(2).innerHTML = item.count;
+               row.insertCell(3).innerHTML = item.date_added;
+               row.insertCell(4).innerHTML = item.time_added;
+               row.insertCell(5).innerHTML = (item.accuracy * 100).toFixed(2) + "%"; // Show accuracy as percentage
+               row.insertCell(6).innerHTML = item.area; // Show bounding box area
+
+               // Action buttons for edit and delete
+               const actionsCell = row.insertCell(7);
+               actionsCell.innerHTML += `<button onclick="prepareEdit(${item.id})">Edit</button> 
+                                         <button onclick="deleteObject(${item.id})">Delete</button>`;
+           });
+       });
+}
+
+// Call fetchInventory every few seconds to update inventory table
+setInterval(fetchInventory, 500); // Update every 0.5 seconds
+
+// Function to prepare edit action by filling input fields with current values
+function prepareEdit(id) {
+   const tbody = document.getElementById('inventory-body');
+   
+   for (let row of tbody.rows) {
+       if (row.cells[0].innerText == id) {
+           document.getElementById('update-object-name').value = row.cells[1].innerText; // Set new object name
+           document.getElementById('update-count').value = row.cells[2].innerText; // Set new count
+           document.getElementById('update-accuracy').value = parseFloat(row.cells[5].innerText) / 100; // Convert back from percentage
+           // Store ID in a hidden input or variable for later use
+           window.selectedItemId = id; // Store ID globally
+           break; 
+       }
+   }
+}
+
+// Function to update an existing inventory item
+function updateObject() {
+   const id = window.selectedItemId; // Use globally stored ID
+   
+   const dataToUpdate = {
+       id: id,
+       object_name: document.getElementById('update-object-name').value, // Get new object name
+       count: parseInt(document.getElementById('update-count').value),
+       accuracy: parseFloat(document.getElementById('update-accuracy').value)
+   };
+
+   console.log("Updating object with data:", dataToUpdate); // Debugging statement
+
+   fetch('/update_inventory', {
+       method: 'POST',
+       headers: { 'Content-Type': 'application/json' },
+       body: JSON.stringify(dataToUpdate)
+   })
+   .then(response => response.json())
+   .then(objects => {
+       fetchInventory(); // Refresh inventory after update
+   });
+}
+
+// Function to delete an inventory item by ID
+function deleteObject(id) {
+   fetch(`/delete_inventory/${id}`, { method: 'DELETE' })
+   .then(response => response.json())
+   .then(objects => {
+       fetchInventory(); // Refresh inventory after deletion
+   });
+}
+
+// Function to export inventory to CSV format
+function exportToCSV() {
+   window.location.href='/export_csv';
+}
+
+// Function to export inventory to XLSX format
+function exportToXLSX() {
+   window.location.href='/export_xlsx';
+}
+</script>
+
+</body>
+</html>
