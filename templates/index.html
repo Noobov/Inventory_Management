@@ -94,6 +94,10 @@
         <button onclick="startVideo()">Start Video Capture</button>
         <button onclick="stopVideo()">Stop Video Capture</button>
         <div>
+            <button onClick = "activateAppendMode()">Append Mode</button>
+            <button onClick = "activateDeleteMode()">Delete Mode</button>
+        </div>
+        <div>
             <img id="video" width="100%">
         </div>
     </div>
@@ -134,6 +138,9 @@
 </div>
 
 <script>
+
+let mode = 1
+
 // Function to start video capture and display it on the webpage
 function startVideo() {
    fetch('/start_video')
@@ -157,6 +164,26 @@ function stopVideo() {
                videoElement.src = ""; // Clear the source of the image to stop displaying the stream
            }
        });
+}
+
+function activateAppendMode(){
+    mode = 1
+    alert("Set to Append mode")
+    fetch('/set_mode' ,{
+        method : 'POST',
+        headers : { 'Content-Type' : 'Application/json'},
+        body : JSON.stringify({'mode' : mode})
+    })
+}
+
+function activateDeleteMode(){
+    mode = 0
+    alert("Set to Delete mode") 
+    fetch('/set_mode' ,{
+        method : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body : JSON.stringify({'mode' : mode})
+    })
 }
 
 // Function to periodically fetch and update inventory
